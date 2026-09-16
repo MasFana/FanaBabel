@@ -1,0 +1,5 @@
+*.sqlite
+*.sqlite-*
+*.fst
+outputs/
+fixtures/

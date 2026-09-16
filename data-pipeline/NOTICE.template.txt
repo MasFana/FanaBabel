@@ -1,0 +1,13 @@
+FanaBabel dictionary data attribution
+
+This generated dictionary may contain data derived from:
+
+1. English WordNet, Copyright 2010 Princeton University, licensed under CC BY 4.0:
+   https://wordnet.princeton.edu/license-and-commercial-use
+
+2. Wiktionary content processed by Wiktextract, licensed under the applicable
+   Creative Commons Attribution-ShareAlike and GNU Free Documentation licenses:
+   https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz
+
+Before release, replace this template with the exact source versions, retrieval
+ dates, checksums, and any notices required by the source snapshots used.

@@ -30,7 +30,7 @@ Download the latest release from [Releases · MasFana/FanaBabel](https://github.
 | Windows installer (MSI) | [Download `.msi`](https://github.com/MasFana/FanaBabel/releases/download/0.1.0/fanababel_0.1.0_x64_en-US.msi) | Managed deployments and Windows Installer workflows |
 | Portable application | [Download `tauri-app.exe`](https://github.com/MasFana/FanaBabel/releases/download/0.1.0/tauri-app.exe) | Running the app without an installer |
 
-The current release provides Windows x64 artifacts. See [https://github.com/MasFana/FanaBabel/releases](RELEASE) for installation instructions, checksums, and release verification details.
+The current release provides Windows x64 artifacts. See [https://github.com/MasFana/FanaBabel/releases](https://github.com/MasFana/FanaBabel/releases) for installation instructions, checksums, and release verification details.
 
 ## Features
 

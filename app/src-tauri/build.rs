@@ -43,9 +43,22 @@ fn build_dictionary_from_source(
     }
 }
 
+fn output_is_newer_than_sources(output: &Path, sources: &[&Path]) -> bool {
+    let Ok(output_modified) = fs::metadata(output).and_then(|metadata| metadata.modified()) else {
+        return false;
+    };
+
+    sources.iter().all(|source| {
+        fs::metadata(source)
+            .and_then(|metadata| metadata.modified())
+            .map(|modified| modified <= output_modified)
+            .unwrap_or(false)
+    })
+}
+
 fn main() {
-    println!("cargo:rerun-if-changed=../data-pipeline");
-    println!("cargo:rerun-if-changed=../data-pipeline/fixtures");
+    println!("cargo:rerun-if-changed=../../data-pipeline/pipeline.py");
+    println!("cargo:rerun-if-changed=../../data-pipeline/fixtures/wiktextract.jsonl");
 
     let manifest_dir =
         PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR should be set"));
@@ -56,11 +69,23 @@ fn main() {
     let resource_dir = manifest_dir.join("resources");
     fs::create_dir_all(&resource_dir).expect("should create the resource folder");
 
+    let pipeline_dir = project_root.join("data-pipeline");
     let output = resource_dir.join("dictionary.sqlite");
     let word_list = resource_dir.join("words.txt");
-    let python = env::var("PYTHON").unwrap_or_else(|_| "python".to_string());
-    let pipeline_dir = project_root.join("data-pipeline");
+    let binding = manifest_dir.join("src").join("generated_dictionary.rs");
+    let pipeline = pipeline_dir.join("pipeline.py");
     let fixture_wiktionary = pipeline_dir.join("fixtures").join("wiktextract.jsonl");
+
+    if output.exists()
+        && word_list.exists()
+        && binding.exists()
+        && output_is_newer_than_sources(&output, &[&pipeline, &fixture_wiktionary])
+    {
+        tauri_build::build();
+        return;
+    }
+
+    let python = env::var("PYTHON").unwrap_or_else(|_| "python".to_string());
     let remote_url = "https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz";
 
     let remote_status = Command::new(&python)

@@ -19,8 +19,19 @@ pub struct WordEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HistoryItem {
+    pub id: i64,
     pub word: String,
     pub searched_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub id: i64,
+    pub word: String,
+    pub searched_at: String,
+    pub pos: Vec<String>,
+    pub definition: Option<String>,
+    pub example: Option<String>,
 }
 
 pub fn normalize_word(input: &str) -> String {
@@ -93,6 +104,7 @@ impl DictionaryDb {
                 word TEXT NOT NULL,
                 searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE INDEX IF NOT EXISTS idx_history_word ON history(word);
             "#,
         )?;
 
@@ -199,7 +211,7 @@ impl DictionaryDb {
     pub fn lookup_word(&self, word: &str) -> Result<Option<WordEntry>> {
         let normalized = normalize_word(word);
         let mut stmt = self.conn.prepare(
-            "SELECT w.word, w.pos, d.definition, s.synonym, e.example FROM words w LEFT JOIN definitions d ON d.word_id = w.id LEFT JOIN synonyms s ON s.word_id = w.id LEFT JOIN examples e ON e.word_id = w.id WHERE lower(w.word) = ? ORDER BY w.id, d.sort_order, s.id, e.id",
+            "SELECT w.word, w.pos, d.definition, s.synonym, e.example FROM words w LEFT JOIN definitions d ON d.word_id = w.id LEFT JOIN synonyms s ON s.word_id = w.id LEFT JOIN examples e ON e.word_id = w.id WHERE w.word = ? ORDER BY w.id, d.sort_order, s.id, e.id",
         )?;
 
         let rows = stmt.query_map([normalized.clone()], |row| {
@@ -253,6 +265,41 @@ impl DictionaryDb {
         Ok(Some(collected))
     }
 
+    pub fn lookup_history_summary(
+        &self,
+        word: &str,
+    ) -> Result<(Vec<String>, Option<String>, Option<String>)> {
+        let normalized = normalize_word(word);
+        let mut stmt = self.conn.prepare(
+            "SELECT w.pos, d.definition, e.example FROM words w LEFT JOIN definitions d ON d.word_id = w.id LEFT JOIN examples e ON e.word_id = w.id WHERE w.word = ? ORDER BY d.sort_order, e.id",
+        )?;
+        let rows = stmt.query_map([normalized], |row| {
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })?;
+        let mut pos = Vec::new();
+        let mut definition = None;
+        let mut example = None;
+        for row in rows {
+            let (part, first_definition, first_example) = row?;
+            if let Some(part) = part {
+                if !pos.contains(&part) {
+                    pos.push(part);
+                }
+            }
+            if definition.is_none() {
+                definition = first_definition;
+            }
+            if example.is_none() {
+                example = first_example;
+            }
+        }
+        Ok((pos, definition, example))
+    }
+
     pub fn get_all_words(&self) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
@@ -280,14 +327,15 @@ impl DictionaryDb {
 
     pub fn get_history(&self, limit: usize) -> Result<Vec<HistoryItem>> {
         let sql = format!(
-            "SELECT word, searched_at FROM history ORDER BY id DESC LIMIT {}",
+            "SELECT id, word, searched_at FROM history ORDER BY id DESC LIMIT {}",
             limit
         );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             Ok(HistoryItem {
-                word: row.get(0)?,
-                searched_at: row.get(1)?,
+                id: row.get(0)?,
+                word: row.get(1)?,
+                searched_at: row.get(2)?,
             })
         })?;
 
@@ -422,25 +470,57 @@ impl AppState {
         Ok(())
     }
 
-    pub fn get_history(&self, limit: usize) -> Result<Vec<HistoryItem>> {
-        let history = self.history.lock().unwrap();
-        let sql = format!(
-            "SELECT word, searched_at FROM history ORDER BY id DESC LIMIT {}",
-            limit
-        );
-        let mut stmt = history.prepare(&sql)?;
-        let rows = stmt.query_map([], |row| {
-            Ok(HistoryItem {
-                word: row.get(0)?,
-                searched_at: row.get(1)?,
-            })
-        })?;
+    pub fn get_history(&self, limit: usize, before_id: Option<i64>) -> Result<Vec<HistoryEntry>> {
+        let page_size = limit.clamp(1, 50);
+        let items: Vec<HistoryItem> = {
+            let history = self.history.lock().unwrap();
+            let mut items = Vec::new();
+            if let Some(cursor) = before_id {
+                let mut stmt = history.prepare(
+                    "SELECT id, word, searched_at FROM history WHERE id < ?1 ORDER BY id DESC LIMIT ?2",
+                )?;
+                let rows = stmt.query_map((cursor, page_size as i64), |row| {
+                    Ok(HistoryItem {
+                        id: row.get(0)?,
+                        word: row.get(1)?,
+                        searched_at: row.get(2)?,
+                    })
+                })?;
+                for row in rows {
+                    items.push(row?);
+                }
+            } else {
+                let mut stmt = history.prepare(
+                    "SELECT id, word, searched_at FROM history ORDER BY id DESC LIMIT ?1",
+                )?;
+                let rows = stmt.query_map([page_size as i64], |row| {
+                    Ok(HistoryItem {
+                        id: row.get(0)?,
+                        word: row.get(1)?,
+                        searched_at: row.get(2)?,
+                    })
+                })?;
+                for row in rows {
+                    items.push(row?);
+                }
+            }
+            items
+        };
 
-        let mut items = Vec::new();
-        for row in rows {
-            items.push(row?);
+        let dictionary = self.dictionary.lock().unwrap();
+        let mut entries = Vec::with_capacity(items.len());
+        for item in items {
+            let (pos, definition, example) = dictionary.lookup_history_summary(&item.word)?;
+            entries.push(HistoryEntry {
+                id: item.id,
+                word: item.word,
+                searched_at: item.searched_at,
+                pos,
+                definition,
+                example,
+            });
         }
-        Ok(items)
+        Ok(entries)
     }
 
     pub fn fuzzy_search(&self, query: &str, limit: usize) -> Result<Vec<String>> {
@@ -455,6 +535,17 @@ impl AppState {
             .iter()
             .filter_map(|word| {
                 if word == &normalized {
+                    return None;
+                }
+
+                if word.len().abs_diff(normalized.len()) > max_distance {
+                    return None;
+                }
+
+                let shares_character = normalized
+                    .chars()
+                    .any(|query_character| word.contains(query_character));
+                if !shares_character {
                     return None;
                 }
 
@@ -586,14 +677,20 @@ mod tests {
         app_state.log_history("ocean").unwrap();
 
         assert!(app_state.get_entry("Dawn").unwrap().is_some());
-        let history = app_state.get_history(10).unwrap();
+        let first_page = app_state.get_history(1, None).unwrap();
+        assert_eq!(first_page.len(), 1);
+        let next_page = app_state.get_history(10, Some(first_page[0].id)).unwrap();
+        assert_eq!(next_page.len(), 1);
+        assert_ne!(first_page[0].id, next_page[0].id);
+
+        let history = app_state.get_history(10, None).unwrap();
         assert_eq!(history.len(), 2);
         assert!(std::fs::metadata(temp_dir.join("history.sqlite")).is_ok());
         assert!(std::fs::metadata(resource_dir.join("dictionary.sqlite")).is_ok());
         assert!(!std::fs::metadata(temp_dir.join("dictionary.sqlite")).is_ok());
 
         let reloaded = AppState::new_with_paths(&temp_dir, &resource_dir).unwrap();
-        assert_eq!(reloaded.get_history(10).unwrap().len(), 2);
+        assert_eq!(reloaded.get_history(10, None).unwrap().len(), 2);
         assert!(reloaded.get_entry("ocean").unwrap().is_some());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -622,8 +719,14 @@ fn log_history(word: String, state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_history(limit: usize, state: State<'_, AppState>) -> Result<Vec<HistoryItem>, String> {
-    state.get_history(limit).map_err(|err| err.to_string())
+fn get_history(
+    limit: usize,
+    before_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<HistoryEntry>, String> {
+    state
+        .get_history(limit, before_id)
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

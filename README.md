@@ -16,6 +16,22 @@
 
 FanaBabel is a local-first desktop dictionary for looking up unfamiliar words without leaving a book or relying on an internet connection. It provides definitions, synonyms, examples, autocomplete, fuzzy search, and a persistent history of recent lookups.
 
+## Screenshot
+
+![FanaBabel application screenshot](Screenshot.png)
+
+## Download
+
+Download the latest release from [Releases · MasFana/FanaBabel](https://github.com/MasFana/FanaBabel/releases).
+
+| Package | Download | Recommended for |
+| --- | --- | --- |
+| Windows installer (NSIS) | [Download `.exe`](https://github.com/MasFana/FanaBabel/releases/download/v0.1.0/fanababel_0.1.0_x64-setup.exe) | Most users; guided installation and Start Menu integration |
+| Windows installer (MSI) | [Download `.msi`](https://github.com/MasFana/FanaBabel/releases/download/v0.1.0/fanababel_0.1.0_x64_en-US.msi) | Managed deployments and Windows Installer workflows |
+| Portable application | [Download `tauri-app.exe`](https://github.com/MasFana/FanaBabel/releases/download/v0.1.0/tauri-app.exe) | Running the app without an installer |
+
+The current release provides Windows x64 artifacts. See [RELEASE.md](RELEASE.md) for installation instructions, checksums, and release verification details.
+
 ## Features
 
 - **Offline dictionary lookup** using data bundled with the desktop application.

@@ -3,3 +3,5 @@
 *.fst
 outputs/
 fixtures/
+*pycache*/
+*pytest_cache/*

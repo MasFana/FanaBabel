@@ -44,19 +44,19 @@ CREATE TABLE definitions (
     definition TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX idx_definitions_word_id ON definitions(word_id);
+CREATE INDEX idx_definitions_word_id ON definitions(word_id, sort_order);
 CREATE TABLE examples (
     id INTEGER PRIMARY KEY,
     word_id INTEGER NOT NULL REFERENCES words(id),
     example TEXT NOT NULL
 );
-CREATE INDEX idx_examples_word_id ON examples(word_id);
+CREATE INDEX idx_examples_word_id ON examples(word_id, id);
 CREATE TABLE synonyms (
     id INTEGER PRIMARY KEY,
     word_id INTEGER NOT NULL REFERENCES words(id),
     synonym TEXT NOT NULL
 );
-CREATE INDEX idx_synonyms_word_id ON synonyms(word_id);
+CREATE INDEX idx_synonyms_word_id ON synonyms(word_id, id);
 CREATE TABLE history (
     id INTEGER PRIMARY KEY,
     word TEXT NOT NULL,

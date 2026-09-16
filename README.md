@@ -37,7 +37,7 @@ The current release provides Windows x64 artifacts. See [https://github.com/MasF
 - **Offline dictionary lookup** using data bundled with the desktop application.
 - **Fast autocomplete** with keyboard-navigable suggestions.
 - **Fuzzy matching** for misspellings and unusual literary vocabulary.
-- **Rich word entries** with parts of speech, definitions, synonyms, and examples.
+- **Rich word entries** definitions, synonyms, and examples.
 - **Persistent search history** stored in the operating system's application-data directory.
 - **Local-first storage** that keeps the read-only dictionary separate from writable user history.
 - **Desktop packaging** through Tauri for Windows, macOS, and Linux targets supported by Tauri.
